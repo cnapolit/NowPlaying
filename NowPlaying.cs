@@ -84,15 +84,37 @@ namespace NowPlaying
             settings.ReturnToGame = (RelayCommand)ReturnCommand;
             settings.OpenCustomDialog = (RelayCommand)LaunchCustomWindowCommand;
 
+            const string sourceName = "NowPlaying";
             AddSettingsSupport(new AddSettingsSupportArgs
             {
-                SourceName = "NowPlaying",
-                SettingsRoot = $"settings"
+                SourceName = sourceName,
+                SettingsRoot = "settings.Settings"
             });
+            PlayniteApi.UriHandler.RegisterSource(sourceName, HandleUriEvent);
 
             // Initialize global keyboard hook
             keyboardHook = new GlobalKeyboardHook();
             keyboardHook.KeyPressed += OnKeyPressed;
+        }
+
+        private void HandleUriEvent(PlayniteUriEventArgs args)
+        {
+            if (args.Arguments.Length < 2)
+            {
+                logger.Error("Invalid arguments for NowPlaying URI handler. Expected at least 2 arguments.");
+                return;
+            }
+
+            var action = args.Arguments[0];
+            var gameId = args.Arguments[1];
+            var runningGame = PlayniteApi.Database.Games.Get(Guid.Parse(gameId));
+            var data = CreateNowPlayingData(PlayniteApi, runningGame, null);
+
+            switch (action.ToLower())
+            {
+                case "focus": GameStateManager.ReturnToGame(data); break;
+                case "stop":  GameStateManager.CloseGame(data); break;
+            }
         }
 
         public static void ExecuteReturnToGame(IPlayniteAPI api)
